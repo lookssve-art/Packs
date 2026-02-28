@@ -147,7 +147,7 @@ async def lifespan(app: FastAPI):
     )
 
     settings = Settings()
-    conn = get_connection(settings.db_path)
+    conn = get_connection(settings.db_path, check_same_thread=False)
     init_db(conn)
 
     ws_manager = WebSocketManager()

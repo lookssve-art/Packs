@@ -116,10 +116,20 @@ CREATE TABLE IF NOT EXISTS pack_types (
 """
 
 
-def get_connection(db_path: str) -> sqlite3.Connection:
-    """Create a new database connection with WAL mode for concurrent access."""
+def get_connection(
+    db_path: str, check_same_thread: bool = True
+) -> sqlite3.Connection:
+    """Create a new database connection with WAL mode for concurrent access.
+
+    Args:
+        db_path: Path to SQLite database file (or ":memory:").
+        check_same_thread: If False, allow the connection to be used across
+            threads.  Required when FastAPI runs sync route handlers in a
+            worker thread pool while the connection was created on the main
+            thread.  Safe here because WAL mode supports concurrent readers.
+    """
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, check_same_thread=check_same_thread)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
