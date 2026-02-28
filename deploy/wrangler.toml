@@ -1,0 +1,16 @@
+name = "key-of-silent-insight"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+# Your FastAPI backend URL (where python scripts/run_web.py is running)
+# Change this to your server's public IP/domain
+BACKEND_URL = "http://localhost:8000"
+
+# Uncomment to use a custom domain
+# [routes]
+# pattern = "thekeyofsilentinsight.com/*"
+# zone_name = "thekeyofsilentinsight.com"
+
+[site]
+bucket = "../src/web"

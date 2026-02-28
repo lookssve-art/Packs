@@ -12,6 +12,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -190,6 +191,20 @@ app = FastAPI(
     title="Packs EV Tracker",
     description="Real-time Magic Eden Pokemon Pack analysis",
     lifespan=lifespan,
+)
+
+# CORS — allow Workers domain and localhost for development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://key-of-silent-insight.solana-nft-portfolio-smorty-2026.workers.dev",
+        "https://thekeyofsilentinsight.com",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # API routes
