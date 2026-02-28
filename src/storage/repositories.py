@@ -86,6 +86,39 @@ class PullRepository:
         rows = self.conn.execute(query, params).fetchall()
         return [self._row_to_pull(r) for r in rows]
 
+    def enrich(self, pull_id: str, card_name: str | None, image_url: str | None, rarity: str | None = None) -> bool:
+        """Update an existing pull with enriched metadata. Returns True if a row was changed."""
+        sets: list[str] = []
+        params: list = []
+        if card_name:
+            sets.append("card_name = ?")
+            params.append(card_name)
+        if image_url:
+            sets.append("image_url = ?")
+            params.append(image_url)
+        if rarity:
+            sets.append("rarity = ?")
+            params.append(rarity)
+        if not sets:
+            return False
+        params.append(pull_id)
+        cur = self.conn.execute(
+            f"UPDATE pulls SET {', '.join(sets)} WHERE pull_id = ? AND (card_name IS NULL OR image_url IS NULL)",
+            params,
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def get_unenriched(self, limit: int = 20) -> list[Pull]:
+        """Get pulls that are missing card_name or image_url."""
+        rows = self.conn.execute(
+            """SELECT * FROM pulls
+               WHERE (card_name IS NULL OR image_url IS NULL) AND token_mint IS NOT NULL
+               ORDER BY timestamp DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [self._row_to_pull(r) for r in rows]
+
     def get_count_by_pack(self) -> dict[str, int]:
         """Get pull count per pack type."""
         rows = self.conn.execute(

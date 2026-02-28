@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import datetime
 
-from config.constants import KNOWN_PACKS, RARITY_ORDER
+from config.constants import COLLECTION_PACK_MAP, KNOWN_PACKS, RARITY_ORDER
 from src.models.confidence import get_confidence_tier, get_haircut
 from src.models.dataclasses import EVResult, PackTypeInfo, Pull
 from src.models.iid_model import IIDModel
@@ -124,9 +124,20 @@ def compute_all_evs(
     if now is None:
         now = datetime.datetime.utcnow()
 
+    # Build reverse map: pack_slug -> set of collection symbols that feed it
+    _pack_sources: dict[str, set[str]] = {}
+    for coll, slugs in COLLECTION_PACK_MAP.items():
+        for s in slugs:
+            _pack_sources.setdefault(s, set()).add(coll)
+
     results = []
     for pack in pack_types:
-        pack_pulls = [p for p in all_pulls if p.pack_type == pack.slug]
+        # Include pulls matching the pack slug OR any mapped collection
+        sources = _pack_sources.get(pack.slug, set())
+        pack_pulls = [
+            p for p in all_pulls
+            if p.pack_type == pack.slug or p.pack_type in sources
+        ]
         rates = (published_rates or {}).get(pack.slug)
         ev = compute_ev(
             pulls=pack_pulls,

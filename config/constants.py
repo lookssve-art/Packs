@@ -35,6 +35,12 @@ FALLBACK_VALUES: dict[str, dict[str, float]] = {
     },
 }
 
+# Map ME collection symbols to pack types they feed data into.
+# All cards in a collection share the same value pool across pack tiers.
+COLLECTION_PACK_MAP: dict[str, list[str]] = {
+    "collector_crypt": ["ruby", "sapphire", "emerald"],
+}
+
 # Generic fallback for unknown pack types
 GENERIC_FALLBACK_VALUES: dict[str, float] = {
     "holographic": 1000.0,

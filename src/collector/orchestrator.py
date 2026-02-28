@@ -154,6 +154,15 @@ class Orchestrator:
             summary["errors"].append(f"me_api: {e}")
             logger.warning("ME API error: %s", e)
 
+        # 2b. Enrich existing pulls missing card_name/image
+        try:
+            enriched = await self._enrich_existing_pulls()
+            if enriched:
+                logger.info("Enriched %d existing pulls", enriched)
+        except Exception as e:
+            summary["errors"].append(f"enrich: {e}")
+            logger.warning("Enrichment error: %s", e)
+
         # 3. Fetch drop rates
         try:
             new_snapshots = await self._fetch_drop_rates()
@@ -230,6 +239,33 @@ class Orchestrator:
             total_new += new_count
 
         return total_new
+
+    async def _enrich_existing_pulls(self) -> int:
+        """Fetch token metadata for pulls missing card_name/image and update DB."""
+        unenriched = self.pull_repo.get_unenriched(limit=10)
+        if not unenriched:
+            return 0
+
+        count = 0
+        for pull in unenriched:
+            if not pull.token_mint:
+                continue
+            meta = await self.me_api.get_token_metadata(pull.token_mint)
+            if not meta:
+                continue
+
+            card_name = meta.get("name")
+            image_url = meta.get("image")
+            rarity = None
+            for attr in (meta.get("attributes") or []):
+                if isinstance(attr, dict):
+                    trait = (attr.get("trait_type") or "").lower()
+                    if trait in ("rarity", "tier"):
+                        rarity = str(attr.get("value", "")).lower()
+
+            if self.pull_repo.enrich(pull.pull_id, card_name, image_url, rarity):
+                count += 1
+        return count
 
     async def _fetch_drop_rates(self) -> int:
         """Fetch and store drop rate snapshots."""
