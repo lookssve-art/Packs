@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packs EV Tracker — Magic Eden</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        base: '#1e1e2e',
+                        surface: '#313244',
+                        overlay: '#6c7086',
+                        ctext: '#cdd6f4',
+                        subtext: '#a6adc8',
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="bg-base text-ctext min-h-screen" x-data="app()" x-init="init()">
+
+    <!-- HEADER -->
+    <header class="bg-surface border-b border-overlay/50 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <h1 class="text-xl font-bold text-blue-400">Packs EV Tracker</h1>
+                <span class="flex items-center gap-1.5 text-xs font-medium"
+                      :class="status.collector_running ? 'text-green-400' : 'text-red-400'">
+                    <span class="live-dot" :class="status.collector_running ? 'bg-green-400' : 'bg-red-400'"></span>
+                    <span x-text="status.collector_running ? 'LIVE' : 'OFFLINE'"></span>
+                </span>
+            </div>
+            <div class="flex items-center gap-6 text-sm text-subtext">
+                <span>Cycle: <strong class="text-ctext" x-text="status.cycle_count || 0"></strong></span>
+                <span>Pulls: <strong class="text-ctext" x-text="(status.total_pulls || 0).toLocaleString()"></strong></span>
+                <span>Updated: <strong class="text-ctext" x-text="formatTimeAgo(status.last_cycle)"></strong></span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+        <!-- HERO: TOP RECOMMENDATION -->
+        <section x-show="topPack" class="bg-gradient-to-r from-surface to-base rounded-xl p-6 border border-overlay/50">
+            <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                    <p class="text-xs text-subtext uppercase tracking-widest">Best Pack Right Now</p>
+                    <h2 class="text-3xl font-bold mt-1" x-text="capitalize(topPack?.pack_type || '') + ' Pack'"></h2>
+                    <div class="flex items-center gap-6 mt-2">
+                        <span class="text-2xl font-mono font-bold"
+                              :class="evRatioColor(topPack?.ev_ratio || 0)"
+                              x-text="(topPack?.ev_ratio || 0).toFixed(3) + 'x'"></span>
+                        <span class="text-subtext">EV: <strong class="text-ctext" x-text="'$' + (topPack?.ev || 0).toFixed(2)"></strong></span>
+                        <span class="text-subtext">Cost: <strong class="text-ctext" x-text="'$' + (topPack?.pack_cost || 0).toFixed(0)"></strong></span>
+                        <span class="text-xs px-2 py-0.5 rounded-full"
+                              :class="confidenceClass(topPack?.confidence_tier || '')"
+                              x-text="(topPack?.confidence_tier || '').replace('_', ' ')"></span>
+                    </div>
+                </div>
+                <a :href="buyUrl" target="_blank" rel="noopener"
+                   class="bg-purple-500 hover:bg-purple-400 text-white px-8 py-3 rounded-lg font-bold text-lg transition-colors whitespace-nowrap">
+                    BUY ON MAGIC EDEN &rarr;
+                </a>
+            </div>
+        </section>
+
+        <!-- MODEL STATUS -->
+        <div class="bg-surface border-l-4 border-blue-400 rounded-r-lg px-4 py-3 text-sm text-subtext">
+            <strong class="text-ctext">IID Model Active</strong> &mdash;
+            Each pull is an independent draw. Past results do NOT make future rare pulls more likely.
+        </div>
+
+        <!-- ACTIVE ALERTS (inline) -->
+        <template x-for="a in activeAlerts" :key="a.id">
+            <div class="rounded-lg px-4 py-3 flex justify-between items-center" :class="alertClass(a.severity)">
+                <div>
+                    <span class="font-bold uppercase text-sm" x-text="'[' + a.severity + ']'"></span>
+                    <span x-text="a.message" class="ml-1"></span>
+                </div>
+                <button @click="acknowledgeAlert(a.id)" class="text-xs underline opacity-70 hover:opacity-100">Dismiss</button>
+            </div>
+        </template>
+
+        <!-- NAV TABS -->
+        <nav class="flex gap-1 border-b border-overlay/30">
+            <button @click="tab='overview'" class="tab-btn" :class="tab==='overview' && 'active'">Overview</button>
+            <button @click="tab='analysis'; $nextTick(() => { buildCharts(); fetchEvHistory(); fetchSnapshots(); })" class="tab-btn" :class="tab==='analysis' && 'active'">Analysis</button>
+            <button @click="tab='alerts'" class="tab-btn" :class="tab==='alerts' && 'active'">Alerts</button>
+        </nav>
+
+        <!-- TAB: OVERVIEW -->
+        <div x-show="tab==='overview'" class="space-y-6">
+
+            <!-- Pack Cards Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <template x-for="ev in evData" :key="ev.pack_type">
+                    <div class="bg-surface rounded-xl p-5 border border-overlay/50 hover:border-blue-400/50 transition-colors">
+                        <div class="flex justify-between items-start mb-4">
+                            <h3 class="text-lg font-bold" x-text="capitalize(ev.pack_type) + ' Pack'"></h3>
+                            <span class="text-xs px-2 py-0.5 rounded-full"
+                                  :class="confidenceClass(ev.confidence_tier)"
+                                  x-text="ev.confidence_tier.replace('_', ' ')"></span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div>
+                                <p class="text-xs text-subtext">Expected Value</p>
+                                <p class="text-xl font-mono font-bold" x-text="'$' + ev.ev.toFixed(2)"></p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-subtext">EV Ratio</p>
+                                <p class="text-xl font-mono font-bold" :class="evRatioColor(ev.ev_ratio)"
+                                   x-text="ev.ev_ratio.toFixed(3)"></p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-subtext">P(Rare+)</p>
+                                <p class="font-mono" x-text="(ev.p_rare_plus * 100).toFixed(2) + '%'"></p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-subtext">P(Super Rare)</p>
+                                <p class="font-mono" x-text="(ev.p_super_rare * 100).toFixed(2) + '%'"></p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-subtext">Pack Cost</p>
+                                <p class="font-mono" x-text="'$' + ev.pack_cost.toFixed(0)"></p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-subtext">Observations</p>
+                                <p class="font-mono" x-text="ev.obs_count.toLocaleString()"></p>
+                            </div>
+                        </div>
+                        <a :href="buyUrl" target="_blank" rel="noopener"
+                           class="block text-center bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 py-2 rounded-lg text-sm font-medium transition-colors">
+                            BUY ON MAGIC EDEN
+                        </a>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Rankings -->
+            <div>
+                <h2 class="text-xl font-bold mb-4">Rankings</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <template x-for="[mode, label] in [['rare_plus','Best Rare+'],['super_rare','Best Super Rare'],['ev_ratio','Best EV Ratio'],['conservative','Conservative']]" :key="mode">
+                        <div class="bg-surface rounded-xl p-4 border border-overlay/50">
+                            <h3 class="text-sm font-bold text-subtext mb-3" x-text="label"></h3>
+                            <template x-for="rp in (rankings[mode] || [])" :key="rp.pack_type">
+                                <div class="flex justify-between py-1.5 border-b border-overlay/20 last:border-0">
+                                    <span>
+                                        <span class="text-subtext mr-1" x-text="'#' + rp.rank"></span>
+                                        <span class="capitalize" x-text="rp.pack_type"></span>
+                                    </span>
+                                    <span class="font-mono text-sm" x-text="rp.label"></span>
+                                </div>
+                            </template>
+                            <div x-show="!rankings[mode] || !rankings[mode].length" class="text-subtext text-sm">No data</div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Live Feed -->
+            <div>
+                <h2 class="text-xl font-bold mb-4">
+                    Live Feed
+                    <span class="text-sm font-normal text-subtext" x-text="'(' + pulls.length + ' recent)'"></span>
+                </h2>
+                <div class="bg-surface rounded-xl border border-overlay/50 overflow-hidden">
+                    <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-base sticky top-0">
+                                <tr class="text-subtext text-left">
+                                    <th class="px-4 py-2.5">Time</th>
+                                    <th class="px-4 py-2.5">Pack</th>
+                                    <th class="px-4 py-2.5">Card</th>
+                                    <th class="px-4 py-2.5">Rarity</th>
+                                    <th class="px-4 py-2.5 text-right">Value</th>
+                                    <th class="px-4 py-2.5 text-right">Payout</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="p in pulls" :key="p.pull_id">
+                                    <tr class="border-t border-overlay/20 hover:bg-overlay/10">
+                                        <td class="px-4 py-2 text-subtext" x-text="formatTimeAgo(p.timestamp)"></td>
+                                        <td class="px-4 py-2 capitalize" x-text="p.pack_type"></td>
+                                        <td class="px-4 py-2" x-text="p.card_name || '---'"></td>
+                                        <td class="px-4 py-2">
+                                            <span class="px-2 py-0.5 rounded text-xs font-bold"
+                                                  :class="rarityClass(p.rarity)"
+                                                  x-text="(p.rarity || '').toUpperCase()"></span>
+                                        </td>
+                                        <td class="px-4 py-2 text-right font-mono"
+                                            x-text="p.estimated_value ? '$' + Number(p.estimated_value).toFixed(0) : '---'"></td>
+                                        <td class="px-4 py-2 text-right font-mono"
+                                            x-text="p.payout_value ? '$' + Number(p.payout_value).toFixed(0) : '---'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="!pulls.length">
+                                    <td colspan="6" class="px-4 py-8 text-center text-subtext">Waiting for data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: ANALYSIS -->
+        <div x-show="tab==='analysis'" class="space-y-6">
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-surface rounded-xl p-5 border border-overlay/50">
+                    <h3 class="text-lg font-bold mb-4">Odds: Published vs Observed</h3>
+                    <div style="height: 300px;"><canvas id="oddsChart"></canvas></div>
+                </div>
+                <div class="bg-surface rounded-xl p-5 border border-overlay/50">
+                    <h3 class="text-lg font-bold mb-4">EV Ratio Trend</h3>
+                    <div style="height: 300px;"><canvas id="evTrendChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Value Calibration Table -->
+            <div>
+                <h2 class="text-xl font-bold mb-4">Calibrated Values per Rarity</h2>
+                <div class="bg-surface rounded-xl border border-overlay/50 overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-base">
+                            <tr class="text-subtext text-left">
+                                <th class="px-4 py-2.5">Pack</th>
+                                <th class="px-4 py-2.5">Rarity</th>
+                                <th class="px-4 py-2.5 text-right">Avg Value</th>
+                                <th class="px-4 py-2.5 text-right">P(Rarity)</th>
+                                <th class="px-4 py-2.5 text-right">90% CI</th>
+                                <th class="px-4 py-2.5 text-right">EV Contribution</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="ev in evData" :key="ev.pack_type">
+                                <template x-for="rarity in ['holographic','gold','silver','gloss']" :key="ev.pack_type + '_' + rarity">
+                                    <tr class="border-t border-overlay/20" x-show="ev.calibrated_values && ev.calibrated_values[rarity]">
+                                        <td class="px-4 py-2 capitalize" x-text="ev.pack_type"></td>
+                                        <td class="px-4 py-2">
+                                            <span :class="rarityClass(rarity)" class="px-2 py-0.5 rounded text-xs font-bold"
+                                                  x-text="rarity.toUpperCase()"></span>
+                                        </td>
+                                        <td class="px-4 py-2 text-right font-mono" x-text="'$' + (ev.calibrated_values[rarity] || 0).toFixed(0)"></td>
+                                        <td class="px-4 py-2 text-right font-mono" x-text="((ev.rarity_posteriors[rarity]?.[0] || 0) * 100).toFixed(2) + '%'"></td>
+                                        <td class="px-4 py-2 text-right font-mono text-subtext"
+                                            x-text="((ev.rarity_posteriors[rarity]?.[1] || 0) * 100).toFixed(2) + '% - ' + ((ev.rarity_posteriors[rarity]?.[2] || 0) * 100).toFixed(2) + '%'"></td>
+                                        <td class="px-4 py-2 text-right font-mono"
+                                            x-text="'$' + ((ev.rarity_posteriors[rarity]?.[0] || 0) * (ev.calibrated_values[rarity] || 0)).toFixed(2)"></td>
+                                    </tr>
+                                </template>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Odds Shift Timeline -->
+            <div>
+                <h2 class="text-xl font-bold mb-4">Odds Shift Timeline</h2>
+                <template x-for="packType in Object.keys(snapshots)" :key="packType">
+                    <div class="bg-surface rounded-xl p-5 border border-overlay/50 mb-4">
+                        <h3 class="text-md font-bold mb-3 capitalize" x-text="packType + ' Drop Rate History'"></h3>
+                        <div style="height: 250px;"><canvas :id="'oddsShift_' + packType"></canvas></div>
+                    </div>
+                </template>
+                <div x-show="Object.keys(snapshots).length === 0" class="text-subtext text-sm">
+                    No odds shift data recorded yet.
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: ALERTS -->
+        <div x-show="tab==='alerts'" class="space-y-6">
+            <h2 class="text-xl font-bold">Active Alerts</h2>
+            <div class="space-y-2">
+                <template x-for="a in activeAlerts" :key="a.id">
+                    <div class="rounded-lg px-4 py-3 flex justify-between items-center" :class="alertClass(a.severity)">
+                        <div>
+                            <span class="font-bold uppercase text-sm" x-text="'[' + a.severity + ']'"></span>
+                            <span x-text="a.message" class="ml-1"></span>
+                            <span class="text-xs opacity-70 ml-2" x-text="formatTimeAgo(a.timestamp)"></span>
+                        </div>
+                        <button @click="acknowledgeAlert(a.id)" class="text-xs underline opacity-70 hover:opacity-100">Dismiss</button>
+                    </div>
+                </template>
+                <div x-show="!activeAlerts.length" class="text-green-400 text-sm py-4">No active alerts.</div>
+            </div>
+
+            <h2 class="text-xl font-bold mt-8">Alert History</h2>
+            <div class="bg-surface rounded-xl border border-overlay/50 overflow-x-auto" x-show="alertHistory.length">
+                <table class="w-full text-sm">
+                    <thead class="bg-base">
+                        <tr class="text-subtext text-left">
+                            <th class="px-4 py-2.5">Time</th>
+                            <th class="px-4 py-2.5">Type</th>
+                            <th class="px-4 py-2.5">Pack</th>
+                            <th class="px-4 py-2.5">Severity</th>
+                            <th class="px-4 py-2.5">Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="a in alertHistory" :key="a.id">
+                            <tr class="border-t border-overlay/20">
+                                <td class="px-4 py-2 text-subtext" x-text="formatTimeAgo(a.timestamp)"></td>
+                                <td class="px-4 py-2" x-text="(a.alert_type || '').replace(/_/g, ' ')"></td>
+                                <td class="px-4 py-2 capitalize" x-text="a.pack_type"></td>
+                                <td class="px-4 py-2">
+                                    <span :class="alertBadgeClass(a.severity)" class="px-2 py-0.5 rounded text-xs font-bold"
+                                          x-text="(a.severity || '').toUpperCase()"></span>
+                                </td>
+                                <td class="px-4 py-2 text-subtext" x-text="a.message"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div x-show="!alertHistory.length" class="text-subtext text-sm">No alerts recorded yet.</div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="max-w-7xl mx-auto px-4 py-8 text-center text-xs text-overlay">
+        Packs EV Tracker | Data updates every 45s via WebSocket | IID Bayesian Model (Dirichlet-Multinomial) | Not financial advice
+    </footer>
+
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/websocket.js"></script>
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+</body>
+</html>

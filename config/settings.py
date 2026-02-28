@@ -52,4 +52,9 @@ class Settings(BaseSettings):
     playwright_headless: bool = True
     playwright_timeout_ms: int = 30000
 
+    # Web server
+    web_host: str = "0.0.0.0"
+    web_port: int = 8000
+    me_packs_url: str = "https://magiceden.io/packs"
+
     model_config = {"env_prefix": "PACKS_", "env_file": ".env"}

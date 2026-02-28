@@ -1,0 +1,41 @@
+/* Catppuccin Mocha dark theme overrides */
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #1e1e2e; }
+::-webkit-scrollbar-thumb { background: #313244; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #6c7086; }
+
+html { scroll-behavior: smooth; }
+
+/* Pulse animation for live indicator */
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+.live-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* New row highlight */
+@keyframes fade-highlight {
+    from { background-color: rgba(137, 180, 250, 0.15); }
+    to { background-color: transparent; }
+}
+.new-row { animation: fade-highlight 2s ease; }
+
+/* Tab active state */
+.tab-btn {
+    padding: 0.5rem 1.25rem;
+    border-bottom: 2px solid transparent;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    color: #a6adc8;
+}
+.tab-btn:hover { color: #cdd6f4; }
+.tab-btn.active {
+    color: #89b4fa;
+    border-bottom-color: #89b4fa;
+}
