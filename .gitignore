@@ -6,9 +6,7 @@ build/
 .eggs/
 *.egg
 .env
-data/packs.db
-data/raw/
-data/discovered_endpoints.json
+data/
 .venv/
 venv/
 .pytest_cache/
