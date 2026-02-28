@@ -13,7 +13,7 @@ class Pull:
     pull_id: str
     timestamp: datetime.datetime
     pack_type: str  # dynamic slug, e.g. 'sapphire', 'emerald'
-    rarity: str     # e.g. 'holographic', 'gold', 'silver', 'gloss'
+    rarity: str     # e.g. 'epic', 'rare', 'uncommon', 'common'
     card_name: Optional[str] = None
     card_id: Optional[str] = None
     token_mint: Optional[str] = None
@@ -43,7 +43,7 @@ class PackTypeInfo:
     cost_usd: float
     sellback_rate: Optional[float] = None
     rarity_tiers: list[str] = field(default_factory=lambda: [
-        "holographic", "gold", "silver", "gloss"
+        "epic", "rare", "uncommon", "common"
     ])
     is_active: bool = True
 
@@ -60,8 +60,8 @@ class EVResult:
     rarity_posteriors: dict[str, tuple[float, float, float]]  # (mean, lower_5, upper_95)
     calibrated_values: dict[str, float]
     model_mode: str  # 'iid' or 'pool'
-    p_rare_plus: float = 0.0      # P(gold or holographic)
-    p_super_rare: float = 0.0     # P(holographic)
+    p_rare_plus: float = 0.0      # P(rare or epic)
+    p_super_rare: float = 0.0     # P(epic)
     conservative_score: float = 0.0  # lower confidence bound of EV ratio
 
 

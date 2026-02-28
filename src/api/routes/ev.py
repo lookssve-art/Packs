@@ -31,9 +31,10 @@ def get_all_ev(
     pack_types = pack_type_repo.get_all_active()
     if not pack_types:
         from config.constants import KNOWN_PACKS
+        display_names = {"ruby": "Ruby", "sapphire": "Sapphire", "emerald": "Emerald"}
         pack_types = [
-            PackTypeInfo(slug=s, display_name=s.title(), cost_usd=i["cost"],
-                         sellback_rate=i.get("sellback_rate"))
+            PackTypeInfo(slug=s, display_name=display_names.get(s, s.title()),
+                         cost_usd=i["cost"], sellback_rate=i.get("sellback_rate"))
             for s, i in KNOWN_PACKS.items()
         ]
 
@@ -43,7 +44,8 @@ def get_all_ev(
 
     pulls = pull_repo.get_recent(limit=settings.max_pulls_window, since=since)
 
-    published_rates: dict[str, dict[str, float]] = {}
+    from config.constants import PUBLISHED_DROP_RATES
+    published_rates: dict[str, dict[str, float]] = dict(PUBLISHED_DROP_RATES)
     for pack in pack_types:
         snap = snapshot_repo.get_latest(pack.slug)
         if snap:
@@ -52,7 +54,7 @@ def get_all_ev(
     ev_results = compute_all_evs(
         all_pulls=pulls,
         pack_types=pack_types,
-        published_rates=published_rates or None,
+        published_rates=published_rates,
         half_life_hours=half_life,
         prior_strength=settings.prior_strength,
     )

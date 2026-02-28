@@ -197,7 +197,7 @@ async def _extract_recent_pulls(page) -> list[dict[str, Any]]:
         page_text = await page.inner_text("body")
 
         # Pattern matching for pull entries
-        rarity_keywords = ["holographic", "gold", "silver", "gloss", "holo"]
+        rarity_keywords = ["epic", "rare", "uncommon", "common", "holographic", "gold", "silver", "gloss", "holo"]
         value_pattern = re.compile(r'\$(\d{1,6}(?:,\d{3})*(?:\.\d{2})?)')
 
         # This is a best-effort extraction; actual selectors depend on page structure
@@ -214,7 +214,7 @@ def _parse_rate_text(text: str) -> list[dict[str, Any]]:
     tiers = []
     lines = text.strip().split("\n")
 
-    rarity_names = {"holographic", "gold", "silver", "gloss", "matte", "grail"}
+    rarity_names = {"epic", "rare", "uncommon", "common", "holographic", "gold", "silver", "gloss", "matte", "grail"}
     pct_pattern = re.compile(r'(\d+\.?\d*)\s*%')
 
     for line in lines:

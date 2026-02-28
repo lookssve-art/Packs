@@ -19,7 +19,7 @@ def parse_drop_rates_from_api(
     """
     rates: dict[str, float] = {}
 
-    # Structure 1: {"rates": {"holographic": 0.02, ...}}
+    # Structure 1: {"rates": {"epic": 0.01, ...}}
     if "rates" in data and isinstance(data["rates"], dict):
         for rarity, rate in data["rates"].items():
             rates[rarity.lower()] = float(rate)

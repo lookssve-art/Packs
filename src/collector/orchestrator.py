@@ -13,7 +13,7 @@ import logging
 import sqlite3
 from typing import Any
 
-from config.constants import KNOWN_PACKS
+from config.constants import KNOWN_PACKS, PUBLISHED_DROP_RATES
 from config.settings import Settings
 from src.alerts.detector import AlertDetector
 from src.data_sources.discovery import discover_endpoints
@@ -28,7 +28,7 @@ from src.parsers.drop_rate_parser import (
     parse_drop_rates_from_api,
     parse_drop_rates_from_scrape,
 )
-from src.parsers.pull_parser import parse_packs_api_pull
+from src.parsers.pull_parser import parse_packs_api_pull, set_sol_price
 from src.storage.database import get_connection, init_db
 from src.storage.repositories import (
     AlertRepository,
@@ -91,14 +91,31 @@ class Orchestrator:
         # Alert detector
         self.alert_detector = AlertDetector(self.settings)
 
-        # Register known pack types
+        # Register known pack types with correct display names
+        display_names = {"ruby": "Ruby", "sapphire": "Sapphire", "emerald": "Emerald"}
         for slug, info in KNOWN_PACKS.items():
             self.pack_type_repo.upsert(PackTypeInfo(
                 slug=slug,
-                display_name=slug.title(),
+                display_name=display_names.get(slug, slug.title()),
                 cost_usd=info["cost"],
                 sellback_rate=info.get("sellback_rate"),
             ))
+
+        # Seed published drop rates so EV calculation works from the start
+        for slug, rates in PUBLISHED_DROP_RATES.items():
+            if not self.snapshot_repo.get_latest(slug):
+                from src.models.dataclasses import DropRateSnapshot
+                snapshot = DropRateSnapshot(
+                    timestamp=datetime.datetime.utcnow(),
+                    pack_type=slug,
+                    rates=rates,
+                    source="published_collector_crypt",
+                )
+                self.snapshot_repo.insert(snapshot)
+                logger.info("Seeded published drop rates for %s", slug)
+
+        # Try to fetch current SOL price
+        await self._update_sol_price()
 
         logger.info("Orchestrator initialized. DB: %s", self.settings.db_path)
 
@@ -135,6 +152,10 @@ class Orchestrator:
             "alerts_triggered": 0,
             "errors": [],
         }
+
+        # 0. Update SOL price every 10 cycles (~7.5 min)
+        if self.cycle_count % 10 == 1:
+            await self._update_sol_price()
 
         # 1. Fetch from Packs API (discovered endpoints)
         try:
@@ -242,6 +263,8 @@ class Orchestrator:
 
     async def _enrich_existing_pulls(self) -> int:
         """Fetch token metadata for pulls missing card_name/image and update DB."""
+        from src.parsers.pull_parser import _normalize_rarity
+
         unenriched = self.pull_repo.get_unenriched(limit=10)
         if not unenriched:
             return 0
@@ -261,11 +284,26 @@ class Orchestrator:
                 if isinstance(attr, dict):
                     trait = (attr.get("trait_type") or "").lower()
                     if trait in ("rarity", "tier"):
-                        rarity = str(attr.get("value", "")).lower()
+                        raw = str(attr.get("value", "")).lower()
+                        rarity = _normalize_rarity(raw)
 
             if self.pull_repo.enrich(pull.pull_id, card_name, image_url, rarity):
                 count += 1
         return count
+
+    async def _update_sol_price(self) -> None:
+        """Fetch current SOL/USD price from CoinGecko (free, no key needed)."""
+        try:
+            url = "https://api.coingecko.com/api/v3/simple/price"
+            params = {"ids": "solana", "vs_currencies": "usd"}
+            result = await self.http.get(url, params)
+            if isinstance(result, dict):
+                price = result.get("solana", {}).get("usd")
+                if price and float(price) > 0:
+                    set_sol_price(float(price))
+                    logger.info("SOL price updated: $%.2f", float(price))
+        except Exception as e:
+            logger.debug("Could not fetch SOL price: %s", e)
 
     async def _fetch_drop_rates(self) -> int:
         """Fetch and store drop rate snapshots."""
@@ -299,8 +337,8 @@ class Orchestrator:
             limit=self.settings.max_pulls_window
         )
 
-        # Get published rates
-        published_rates: dict[str, dict[str, float]] = {}
+        # Get published rates — start with hardcoded, override with DB snapshots
+        published_rates: dict[str, dict[str, float]] = dict(PUBLISHED_DROP_RATES)
         for pack in pack_types:
             snapshot = self.snapshot_repo.get_latest(pack.slug)
             if snapshot:
@@ -310,7 +348,7 @@ class Orchestrator:
         ev_results = compute_all_evs(
             all_pulls=all_pulls,
             pack_types=pack_types,
-            published_rates=published_rates if published_rates else None,
+            published_rates=published_rates,
             half_life_hours=self.settings.default_half_life_hours,
             prior_strength=self.settings.prior_strength,
         )

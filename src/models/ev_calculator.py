@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import datetime
 
-from config.constants import COLLECTION_PACK_MAP, KNOWN_PACKS, RARITY_ORDER
+from config.constants import COLLECTION_PACK_MAP, KNOWN_PACKS, PUBLISHED_DROP_RATES, RARITY_ORDER
 from src.models.confidence import get_confidence_tier, get_haircut
 from src.models.dataclasses import EVResult, PackTypeInfo, Pull
 from src.models.iid_model import IIDModel
@@ -82,7 +82,7 @@ def compute_ev(
     ev_conservative = 0.0
     for rarity in all_rarities:
         # Use lower CI bound for valuable rarities, upper for common
-        if rarity in {"holographic", "gold"}:
+        if rarity in {"epic", "rare"}:
             p = posteriors.get(rarity, (0.0, 0.0, 0.0))[1]  # lower bound
         else:
             p = posteriors.get(rarity, (0.0, 0.0, 0.0))[2]  # upper bound
@@ -138,7 +138,10 @@ def compute_all_evs(
             p for p in all_pulls
             if p.pack_type == pack.slug or p.pack_type in sources
         ]
+        # Use caller-provided rates, or fall back to published rates
         rates = (published_rates or {}).get(pack.slug)
+        if rates is None:
+            rates = PUBLISHED_DROP_RATES.get(pack.slug)
         ev = compute_ev(
             pulls=pack_pulls,
             pack_type=pack.slug,

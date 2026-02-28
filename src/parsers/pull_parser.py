@@ -6,7 +6,69 @@ import datetime
 import hashlib
 from typing import Any
 
+from config.constants import (
+    DEFAULT_SOL_USD,
+    PACK_TYPE_VALUE_THRESHOLDS_USD,
+    RARITY_VALUE_THRESHOLDS_USD,
+)
 from src.models.dataclasses import Pull
+
+# Module-level SOL price, updated by orchestrator
+_sol_usd_price: float = DEFAULT_SOL_USD
+
+
+def set_sol_price(price: float) -> None:
+    """Update the SOL/USD price used for conversions."""
+    global _sol_usd_price
+    if price > 0:
+        _sol_usd_price = price
+
+
+def get_sol_price() -> float:
+    """Get current SOL/USD price."""
+    return _sol_usd_price
+
+
+def _sol_to_usd(sol_amount: float) -> float:
+    """Convert SOL amount to USD."""
+    return sol_amount * _sol_usd_price
+
+
+def _infer_pack_type_from_usd(value_usd: float) -> str:
+    """Infer which pack a card likely came from based on its USD value."""
+    if value_usd >= PACK_TYPE_VALUE_THRESHOLDS_USD["emerald"]:
+        return "emerald"
+    elif value_usd >= PACK_TYPE_VALUE_THRESHOLDS_USD["sapphire"]:
+        return "sapphire"
+    return "ruby"
+
+
+def _infer_rarity_from_usd(value_usd: float) -> str:
+    """Infer card rarity from its USD value."""
+    if value_usd >= RARITY_VALUE_THRESHOLDS_USD["epic"]:
+        return "epic"
+    elif value_usd >= RARITY_VALUE_THRESHOLDS_USD["rare"]:
+        return "rare"
+    elif value_usd >= RARITY_VALUE_THRESHOLDS_USD["uncommon"]:
+        return "uncommon"
+    return "common"
+
+
+def _normalize_rarity(raw: str) -> str:
+    """Normalize rarity strings from various sources to our canonical names."""
+    r = raw.strip().lower()
+    mapping = {
+        "holographic": "epic",
+        "holo": "epic",
+        "gold": "rare",
+        "silver": "uncommon",
+        "gloss": "common",
+        "epic": "epic",
+        "rare": "rare",
+        "uncommon": "uncommon",
+        "common": "common",
+    }
+    return mapping.get(r, "common")
 
 
 def parse_me_activity(activity: dict[str, Any], pack_type: str = "") -> Pull | None:
@@ -18,7 +80,7 @@ def parse_me_activity(activity: dict[str, Any], pack_type: str = "") -> Pull | N
     - tokenMint
     - blockTime
     - buyer / seller
-    - price
+    - price (in SOL)
     - image
     - collectionSymbol
     """
@@ -35,35 +97,46 @@ def parse_me_activity(activity: dict[str, Any], pack_type: str = "") -> Pull | N
     else:
         ts = datetime.datetime.utcnow()
 
-    price = activity.get("price")
-    estimated_value = float(price) if price else None
+    # Price from ME API is in SOL — convert to USD
+    price_sol = activity.get("price")
+    if price_sol is not None:
+        value_usd = _sol_to_usd(float(price_sol))
+    else:
+        value_usd = None
 
-    # Use enriched rarity from token metadata if available, else infer
-    rarity = activity.get("_enriched_rarity") or _infer_rarity_from_activity(activity)
+    # Use enriched rarity from token metadata if available, else infer from USD value
+    enriched_rarity = activity.get("_enriched_rarity")
+    if enriched_rarity:
+        rarity = _normalize_rarity(enriched_rarity)
+    elif value_usd is not None:
+        rarity = _infer_rarity_from_usd(value_usd)
+    else:
+        rarity = "common"
+
+    # Infer pack type from value if the source is a generic collection symbol
+    inferred_pack = pack_type
+    if pack_type in ("collector_crypt", "") and value_usd is not None:
+        inferred_pack = _infer_pack_type_from_usd(value_usd)
+    elif not pack_type:
+        inferred_pack = "sapphire"
 
     return Pull(
         pull_id=pull_id,
         timestamp=ts,
-        pack_type=pack_type or activity.get("collectionSymbol", "unknown"),
+        pack_type=inferred_pack,
         rarity=rarity,
         card_name=activity.get("name"),
         token_mint=mint,
-        estimated_value=estimated_value,
+        estimated_value=round(value_usd, 2) if value_usd is not None else None,
         image_url=activity.get("image"),
         source="api_collection",
     )
 
 
 def parse_packs_api_pull(data: dict[str, Any]) -> Pull | None:
-    """Parse a pull from a discovered Packs-specific API endpoint.
-
-    Schema will be determined after endpoint discovery. This parser
-    handles the most common expected structures.
-    """
-    # Generate pull_id from available identifiers
+    """Parse a pull from a discovered Packs-specific API endpoint."""
     pull_id = data.get("id") or data.get("pull_id") or data.get("transactionId")
     if not pull_id:
-        # Create deterministic ID from content
         content = f"{data.get('timestamp', '')}{data.get('cardName', '')}{data.get('value', '')}"
         pull_id = f"packs:{hashlib.sha256(content.encode()).hexdigest()[:16]}"
 
@@ -78,15 +151,16 @@ def parse_packs_api_pull(data: dict[str, Any]) -> Pull | None:
     else:
         ts = datetime.datetime.utcnow()
 
-    # Extract rarity — try multiple field names
-    rarity = (
+    # Extract rarity and normalize
+    raw_rarity = (
         data.get("rarity", "")
         or data.get("tier", "")
         or data.get("rarityTier", "")
         or "unknown"
-    ).lower()
+    )
+    rarity = _normalize_rarity(raw_rarity)
 
-    # Extract value
+    # Extract value (already in USD from packs API)
     value = data.get("value") or data.get("estimatedValue") or data.get("marketValue")
     estimated_value = float(value) if value else None
 
@@ -127,7 +201,8 @@ def parse_scraped_pull(data: dict[str, Any]) -> Pull | None:
     else:
         ts = datetime.datetime.utcnow()
 
-    rarity = (data.get("rarity") or "unknown").lower()
+    raw_rarity = (data.get("rarity") or "unknown")
+    rarity = _normalize_rarity(raw_rarity)
 
     value = data.get("value") or data.get("estimated_value")
     estimated_value = float(value) if value else None
@@ -145,43 +220,3 @@ def parse_scraped_pull(data: dict[str, Any]) -> Pull | None:
         image_url=data.get("image_url"),
         source="scraper",
     )
-
-
-def _infer_rarity_from_activity(activity: dict[str, Any]) -> str:
-    """Try to infer rarity from activity data.
-
-    Looks at attributes, name patterns, and price ranges.
-    """
-    # Check for explicit rarity field
-    attrs = activity.get("attributes") or []
-    for attr in attrs:
-        if isinstance(attr, dict):
-            trait = (attr.get("trait_type") or "").lower()
-            if trait in ("rarity", "tier"):
-                return str(attr.get("value", "unknown")).lower()
-
-    # Check name for rarity keywords
-    name = (activity.get("name") or "").lower()
-    if "holographic" in name or "holo" in name:
-        return "holographic"
-    if "gold" in name:
-        return "gold"
-    if "silver" in name:
-        return "silver"
-    if "gloss" in name:
-        return "gloss"
-
-    # Infer from price if available
-    price = activity.get("price")
-    if price is not None:
-        price_val = float(price)
-        if price_val >= 500:
-            return "holographic"
-        elif price_val >= 100:
-            return "gold"
-        elif price_val >= 40:
-            return "silver"
-        else:
-            return "gloss"
-
-    return "unknown"

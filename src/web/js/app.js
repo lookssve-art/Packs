@@ -141,12 +141,21 @@ function app() {
         },
         rarityClass(rarity) {
             var m = {
-                'holographic': 'bg-red-500/20 text-red-400',
-                'gold': 'bg-yellow-500/20 text-yellow-400',
-                'silver': 'bg-gray-400/20 text-gray-300',
-                'gloss': 'bg-gray-600/20 text-gray-500',
+                'epic': 'bg-red-500/20 text-red-400',
+                'rare': 'bg-yellow-500/20 text-yellow-400',
+                'uncommon': 'bg-blue-400/20 text-blue-300',
+                'common': 'bg-gray-600/20 text-gray-400',
             };
             return m[(rarity || '').toLowerCase()] || 'bg-gray-500/20 text-gray-400';
+        },
+        rarityLabel(rarity) {
+            var m = {
+                'epic': 'Epic (1%)',
+                'rare': 'Rare (4%)',
+                'uncommon': 'Uncommon (15%)',
+                'common': 'Common (80%)',
+            };
+            return m[(rarity || '').toLowerCase()] || (rarity || 'Unknown').toUpperCase();
         },
         alertClass(severity) {
             var m = {

@@ -99,9 +99,9 @@ class IIDModel:
     def p_rare_plus(
         self, weighted_counts: dict[str, float]
     ) -> float:
-        """P(holographic or gold) — posterior mean."""
+        """P(epic or rare) — posterior mean."""
         means = self.posterior_means(weighted_counts)
-        rare_rarities = {"holographic", "gold"}
+        rare_rarities = {"epic", "rare"}
         return sum(
             v for k, v in means.items() if k in rare_rarities
         )
@@ -109,16 +109,16 @@ class IIDModel:
     def p_super_rare(
         self, weighted_counts: dict[str, float]
     ) -> float:
-        """P(holographic) — posterior mean."""
+        """P(epic) — posterior mean."""
         means = self.posterior_means(weighted_counts)
-        return means.get("holographic", 0.0)
+        return means.get("epic", 0.0)
 
     def conservative_p_rare_plus(
         self, weighted_counts: dict[str, float], ci_level: float = 0.90
     ) -> float:
         """Lower bound of P(rare+) using lower credible interval."""
         intervals = self.credible_intervals(weighted_counts, ci_level)
-        rare_rarities = {"holographic", "gold"}
+        rare_rarities = {"epic", "rare"}
         return sum(
             intervals[r][1]  # lower bound
             for r in rare_rarities

@@ -15,6 +15,7 @@ from config.constants import (
     CONFIDENCE_VERY_CONSERVATIVE,
     FALLBACK_VALUES,
     GENERIC_FALLBACK_VALUES,
+    RARITY_ORDER,
 )
 from src.models.confidence import get_confidence_tier
 
@@ -71,7 +72,11 @@ def calibrate_values_with_confidence(
     tiers: dict[str, str] = {}
     counts: dict[str, int] = {}
 
-    for rarity, pairs in value_weight_pairs.items():
+    # Ensure all standard rarities are included (with fallback values if no data)
+    all_rarities = set(RARITY_ORDER) | set(value_weight_pairs.keys())
+
+    for rarity in all_rarities:
+        pairs = value_weight_pairs.get(rarity, [])
         n = len(pairs)
         counts[rarity] = n
         tiers[rarity] = get_confidence_tier(n, threshold_partial, threshold_calibrated)

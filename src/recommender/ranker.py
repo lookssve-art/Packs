@@ -1,8 +1,9 @@
-"""Pack ranking engine — ranks packs across 3 modes.
+"""Pack ranking engine — ranks packs across 4 modes.
 
-1. Best Rare+ chance (P(holographic or gold))
-2. Best Super Rare chance (P(holographic))
+1. Best Rare+ chance (P(epic or rare))
+2. Best Super Rare chance (P(epic))
 3. Best EV Ratio
+4. Conservative score
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ class RankedPack:
 
 
 def rank_by_rare_plus(ev_results: list[EVResult]) -> list[RankedPack]:
-    """Rank packs by P(Rare+) = P(holographic or gold)."""
+    """Rank packs by P(Rare+) = P(epic or rare)."""
     sorted_results = sorted(ev_results, key=lambda e: e.p_rare_plus, reverse=True)
     return [
         RankedPack(
@@ -40,7 +41,7 @@ def rank_by_rare_plus(ev_results: list[EVResult]) -> list[RankedPack]:
 
 
 def rank_by_super_rare(ev_results: list[EVResult]) -> list[RankedPack]:
-    """Rank packs by P(Super Rare) = P(holographic)."""
+    """Rank packs by P(Super Rare) = P(epic)."""
     sorted_results = sorted(ev_results, key=lambda e: e.p_super_rare, reverse=True)
     return [
         RankedPack(

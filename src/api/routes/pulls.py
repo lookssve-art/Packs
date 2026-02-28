@@ -6,6 +6,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 
+from config.constants import RARITY_LABELS, RARITY_PCT
 from src.api.dependencies import get_pull_repo
 
 router = APIRouter(tags=["pulls"])
@@ -24,6 +25,8 @@ def get_recent_pulls(
             "timestamp": p.timestamp.isoformat(),
             "pack_type": p.pack_type,
             "rarity": p.rarity,
+            "rarity_label": RARITY_LABELS.get(p.rarity, p.rarity),
+            "rarity_pct": RARITY_PCT.get(p.rarity, 0),
             "card_name": p.card_name,
             "estimated_value": p.estimated_value,
             "payout_value": p.payout_value,

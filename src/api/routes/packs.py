@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
+from config.constants import PUBLISHED_DROP_RATES, RARITY_LABELS
 from src.api.dependencies import get_pack_type_repo, get_settings
 
 router = APIRouter(tags=["packs"])
@@ -24,6 +25,8 @@ def get_packs(
             "rarity_tiers": p.rarity_tiers,
             "is_active": p.is_active,
             "buy_url": settings.me_packs_url,
+            "drop_rates": PUBLISHED_DROP_RATES.get(p.slug, {}),
+            "rarity_labels": RARITY_LABELS,
         }
         for p in packs
     ]

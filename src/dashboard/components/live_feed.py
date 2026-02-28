@@ -57,10 +57,10 @@ def render_live_feed(pulls: list[Pull], max_items: int = 30) -> None:
 
 def _rarity_badge(rarity: str) -> str:
     """Format rarity with visual indicator."""
-    icons = {
-        "holographic": "HOLO",
-        "gold": "GOLD",
-        "silver": "SILVER",
-        "gloss": "GLOSS",
+    labels = {
+        "epic": "Epic (1%)",
+        "rare": "Rare (4%)",
+        "uncommon": "Uncommon (15%)",
+        "common": "Common (80%)",
     }
-    return icons.get(rarity.lower(), rarity.upper())
+    return labels.get(rarity.lower(), rarity.upper())

@@ -30,8 +30,8 @@ def render_odds_shift(
         timestamps = [s.timestamp for s in sorted_snaps]
 
         fig = go.Figure()
-        colors = {"holographic": "#f38ba8", "gold": "#f9e2af",
-                  "silver": "#a6adc8", "gloss": "#585b70"}
+        colors = {"epic": "#f38ba8", "rare": "#f9e2af",
+                  "uncommon": "#89b4fa", "common": "#585b70"}
 
         for rarity in RARITY_ORDER:
             rates = [s.rates.get(rarity, 0.0) * 100 for s in sorted_snaps]

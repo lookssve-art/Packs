@@ -188,7 +188,7 @@
                                 <template x-for="p in pulls" :key="p.pull_id">
                                     <tr class="border-t border-overlay/20 hover:bg-overlay/10">
                                         <td class="px-4 py-2 text-subtext whitespace-nowrap" x-text="formatTimeAgo(p.timestamp)"></td>
-                                        <td class="px-4 py-2 capitalize whitespace-nowrap" x-text="p.pack_type"></td>
+                                        <td class="px-4 py-2 capitalize whitespace-nowrap" x-text="capitalize(p.pack_type) + ' Pack'"></td>
                                         <td class="px-4 py-2">
                                             <div class="flex items-center gap-3">
                                                 <img x-show="p.image_url"
@@ -207,10 +207,10 @@
                                         <td class="px-4 py-2">
                                             <span class="px-2 py-0.5 rounded text-xs font-bold"
                                                   :class="rarityClass(p.rarity)"
-                                                  x-text="(p.rarity || 'UNKNOWN').toUpperCase()"></span>
+                                                  x-text="p.rarity_label || rarityLabel(p.rarity)"></span>
                                         </td>
                                         <td class="px-4 py-2 text-right font-mono font-bold"
-                                            :class="p.estimated_value >= 100 ? 'text-green-400' : p.estimated_value >= 40 ? 'text-yellow-400' : 'text-ctext'"
+                                            :class="p.estimated_value >= 250 ? 'text-green-400' : p.estimated_value >= 60 ? 'text-yellow-400' : 'text-ctext'"
                                             x-text="p.estimated_value != null ? '$' + Number(p.estimated_value).toFixed(0) : '---'"></td>
                                         <td class="px-4 py-2 text-right font-mono"
                                             x-text="p.payout_value ? '$' + Number(p.payout_value).toFixed(0) : '---'"></td>
@@ -258,12 +258,12 @@
                         </thead>
                         <tbody>
                             <template x-for="ev in evData" :key="ev.pack_type">
-                                <template x-for="rarity in ['holographic','gold','silver','gloss']" :key="ev.pack_type + '_' + rarity">
+                                <template x-for="rarity in ['epic','rare','uncommon','common']" :key="ev.pack_type + '_' + rarity">
                                     <tr class="border-t border-overlay/20" x-show="ev.calibrated_values && ev.calibrated_values[rarity]">
-                                        <td class="px-4 py-2 capitalize" x-text="ev.pack_type"></td>
+                                        <td class="px-4 py-2 capitalize" x-text="capitalize(ev.pack_type) + ' Pack'"></td>
                                         <td class="px-4 py-2">
                                             <span :class="rarityClass(rarity)" class="px-2 py-0.5 rounded text-xs font-bold"
-                                                  x-text="rarity.toUpperCase()"></span>
+                                                  x-text="rarityLabel(rarity)"></span>
                                         </td>
                                         <td class="px-4 py-2 text-right font-mono" x-text="'$' + (ev.calibrated_values[rarity] || 0).toFixed(0)"></td>
                                         <td class="px-4 py-2 text-right font-mono" x-text="((ev.rarity_posteriors[rarity]?.[0] || 0) * 100).toFixed(2) + '%'"></td>

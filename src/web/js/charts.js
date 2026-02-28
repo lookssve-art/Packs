@@ -17,8 +17,9 @@ function buildOddsChart(canvasId, evData, snapshots) {
     if (!ctx || !evData || !evData.length) return;
 
     var ev = evData[0];
-    var rarities = ['holographic', 'gold', 'silver', 'gloss'];
-    var labels = rarities.map(function(r) { return capitalize(r); });
+    var rarities = ['epic', 'rare', 'uncommon', 'common'];
+    var rarityLabels = {'epic': 'Epic (1%)', 'rare': 'Rare (4%)', 'uncommon': 'Uncommon (15%)', 'common': 'Common (80%)'};
+    var labels = rarities.map(function(r) { return rarityLabels[r] || capitalize(r); });
 
     var observed = rarities.map(function(r) {
         var p = ev.rarity_posteriors[r];
@@ -104,16 +105,17 @@ function buildOddsShiftChart(canvasId, snapshots) {
     if (!ctx || !snapshots || snapshots.length < 2) return;
 
     var rarityColors = {
-        holographic: CAT.red, gold: CAT.yellow,
-        silver: '#a6adc8', gloss: '#585b70',
+        epic: CAT.red, rare: CAT.yellow,
+        uncommon: CAT.blue, common: '#585b70',
     };
     var sorted = snapshots.slice().sort(function(a, b) {
         return a.timestamp.localeCompare(b.timestamp);
     });
-    var rarities = ['holographic', 'gold', 'silver', 'gloss'];
+    var rarities = ['epic', 'rare', 'uncommon', 'common'];
+    var rarityLabels = {'epic': 'Epic (1%)', 'rare': 'Rare (4%)', 'uncommon': 'Uncommon (15%)', 'common': 'Common (80%)'};
     var datasets = rarities.map(function(r) {
         return {
-            label: capitalize(r),
+            label: rarityLabels[r] || capitalize(r),
             data: sorted.map(function(s) { return { x: s.timestamp, y: (s.rates[r] || 0) * 100 }; }),
             borderColor: rarityColors[r], backgroundColor: 'transparent',
             tension: 0.2, pointRadius: 4, borderWidth: 2,

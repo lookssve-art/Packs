@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from config.constants import PUBLISHED_DROP_RATES, RARITY_LABELS, RARITY_PCT
 from config.settings import Settings
 from src.api.routes import alerts, ev, packs, pulls, rankings, snapshots, status, ws
 from src.api.websocket_manager import WebSocketManager
@@ -64,6 +65,8 @@ async def _collector_loop(
                             "timestamp": p.timestamp.isoformat(),
                             "pack_type": p.pack_type,
                             "rarity": p.rarity,
+                            "rarity_label": RARITY_LABELS.get(p.rarity, p.rarity),
+                            "rarity_pct": RARITY_PCT.get(p.rarity, 0),
                             "card_name": p.card_name,
                             "estimated_value": p.estimated_value,
                             "payout_value": p.payout_value,
@@ -82,7 +85,7 @@ async def _collector_loop(
                 pack_types = pack_repo.get_all_active()
                 if pack_types:
                     all_pulls = pull_repo.get_recent(limit=settings.max_pulls_window)
-                    pub_rates: dict = {}
+                    pub_rates: dict = dict(PUBLISHED_DROP_RATES)
                     for pt in pack_types:
                         s = snap_repo.get_latest(pt.slug)
                         if s:
@@ -91,7 +94,7 @@ async def _collector_loop(
                     evs = compute_all_evs(
                         all_pulls=all_pulls,
                         pack_types=pack_types,
-                        published_rates=pub_rates or None,
+                        published_rates=pub_rates,
                         half_life_hours=settings.default_half_life_hours,
                     )
                     ev_data = [
