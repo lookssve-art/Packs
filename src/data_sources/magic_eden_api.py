@@ -65,6 +65,54 @@ class MagicEdenAPIClient:
             logger.warning("Failed to fetch stats for %s: %s", symbol, e)
             return {}
 
+    async def get_token_metadata(self, mint_address: str) -> dict[str, Any]:
+        """Fetch token metadata (name, image, attributes) for a given mint."""
+        url = f"{self.base_url}/tokens/{mint_address}"
+        try:
+            result = await self.http.get(url)
+            return result if isinstance(result, dict) else {}
+        except Exception as e:
+            logger.debug("Failed to fetch token metadata for %s: %s", mint_address, e)
+            return {}
+
+    async def enrich_pulls_metadata(
+        self,
+        pulls: list[dict[str, Any]],
+        max_enrichments: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Enrich pulls that are missing name/image with token metadata.
+
+        Only enriches up to max_enrichments per call to respect rate limits.
+        """
+        enriched = 0
+        for pull in pulls:
+            if enriched >= max_enrichments:
+                break
+            mint = pull.get("tokenMint") or pull.get("token_mint")
+            if not mint:
+                continue
+            if pull.get("name") and pull.get("image"):
+                continue
+
+            meta = await self.get_token_metadata(mint)
+            if meta:
+                if not pull.get("name"):
+                    pull["name"] = meta.get("name")
+                if not pull.get("image"):
+                    pull["image"] = meta.get("image")
+                # Extract rarity from attributes if available
+                for attr in (meta.get("attributes") or []):
+                    if isinstance(attr, dict):
+                        trait = (attr.get("trait_type") or "").lower()
+                        if trait in ("rarity", "tier"):
+                            pull["_enriched_rarity"] = str(
+                                attr.get("value", "")
+                            ).lower()
+                enriched += 1
+
+        logger.info("Enriched %d pulls with token metadata", enriched)
+        return pulls
+
     async def get_all_activities(
         self,
         symbols: list[str] | None = None,

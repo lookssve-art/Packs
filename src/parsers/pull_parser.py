@@ -38,8 +38,8 @@ def parse_me_activity(activity: dict[str, Any], pack_type: str = "") -> Pull | N
     price = activity.get("price")
     estimated_value = float(price) if price else None
 
-    # Try to extract rarity from attributes or name
-    rarity = _infer_rarity_from_activity(activity)
+    # Use enriched rarity from token metadata if available, else infer
+    rarity = activity.get("_enriched_rarity") or _infer_rarity_from_activity(activity)
 
     return Pull(
         pull_id=pull_id,

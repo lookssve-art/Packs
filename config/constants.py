@@ -7,6 +7,7 @@ RARITY_ORDER = ["holographic", "gold", "silver", "gloss"]
 
 # Known pack defaults (used when dynamic discovery hasn't run yet)
 KNOWN_PACKS = {
+    "ruby": {"cost": 25.0, "sellback_rate": 0.80},
     "sapphire": {"cost": 50.0, "sellback_rate": 0.85},
     "emerald": {"cost": 250.0, "sellback_rate": 0.90},
 }
@@ -14,6 +15,12 @@ KNOWN_PACKS = {
 # Fallback value estimates per rarity per pack type
 # Used ONLY when fewer than 3 observations exist (conservative)
 FALLBACK_VALUES: dict[str, dict[str, float]] = {
+    "ruby": {
+        "holographic": 400.0,
+        "gold": 80.0,
+        "silver": 30.0,
+        "gloss": 15.0,
+    },
     "sapphire": {
         "holographic": 800.0,
         "gold": 150.0,

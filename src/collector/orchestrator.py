@@ -212,6 +212,11 @@ class Orchestrator:
 
         total_new = 0
         for symbol, activities in all_activities.items():
+            # Enrich activities missing name/image with token metadata
+            await self.me_api.enrich_pulls_metadata(
+                activities, max_enrichments=10
+            )
+
             # Store raw
             self.raw_repo.insert(
                 source="api_v2_activities",

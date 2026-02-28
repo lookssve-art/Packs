@@ -172,9 +172,9 @@
                     <span class="text-sm font-normal text-subtext" x-text="'(' + pulls.length + ' recent)'"></span>
                 </h2>
                 <div class="bg-surface rounded-xl border border-overlay/50 overflow-hidden">
-                    <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                    <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
                         <table class="w-full text-sm">
-                            <thead class="bg-base sticky top-0">
+                            <thead class="bg-base sticky top-0 z-10">
                                 <tr class="text-subtext text-left">
                                     <th class="px-4 py-2.5">Time</th>
                                     <th class="px-4 py-2.5">Pack</th>
@@ -187,16 +187,31 @@
                             <tbody>
                                 <template x-for="p in pulls" :key="p.pull_id">
                                     <tr class="border-t border-overlay/20 hover:bg-overlay/10">
-                                        <td class="px-4 py-2 text-subtext" x-text="formatTimeAgo(p.timestamp)"></td>
-                                        <td class="px-4 py-2 capitalize" x-text="p.pack_type"></td>
-                                        <td class="px-4 py-2" x-text="p.card_name || '---'"></td>
+                                        <td class="px-4 py-2 text-subtext whitespace-nowrap" x-text="formatTimeAgo(p.timestamp)"></td>
+                                        <td class="px-4 py-2 capitalize whitespace-nowrap" x-text="p.pack_type"></td>
+                                        <td class="px-4 py-2">
+                                            <div class="flex items-center gap-3">
+                                                <img x-show="p.image_url"
+                                                     :src="p.image_url"
+                                                     :alt="p.card_name || 'Card'"
+                                                     class="w-10 h-10 rounded object-cover flex-shrink-0 bg-overlay/20"
+                                                     loading="lazy"
+                                                     onerror="this.style.display='none'">
+                                                <div x-show="!p.image_url"
+                                                     class="w-10 h-10 rounded bg-overlay/20 flex items-center justify-center flex-shrink-0">
+                                                    <span class="text-overlay text-xs">?</span>
+                                                </div>
+                                                <span class="truncate max-w-[200px]" x-text="p.card_name || 'Unknown Card'"></span>
+                                            </div>
+                                        </td>
                                         <td class="px-4 py-2">
                                             <span class="px-2 py-0.5 rounded text-xs font-bold"
                                                   :class="rarityClass(p.rarity)"
-                                                  x-text="(p.rarity || '').toUpperCase()"></span>
+                                                  x-text="(p.rarity || 'UNKNOWN').toUpperCase()"></span>
                                         </td>
-                                        <td class="px-4 py-2 text-right font-mono"
-                                            x-text="p.estimated_value ? '$' + Number(p.estimated_value).toFixed(0) : '---'"></td>
+                                        <td class="px-4 py-2 text-right font-mono font-bold"
+                                            :class="p.estimated_value >= 100 ? 'text-green-400' : p.estimated_value >= 40 ? 'text-yellow-400' : 'text-ctext'"
+                                            x-text="p.estimated_value != null ? '$' + Number(p.estimated_value).toFixed(0) : '---'"></td>
                                         <td class="px-4 py-2 text-right font-mono"
                                             x-text="p.payout_value ? '$' + Number(p.payout_value).toFixed(0) : '---'"></td>
                                     </tr>

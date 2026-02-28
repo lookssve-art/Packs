@@ -106,6 +106,13 @@ async def _collector_loop(
                             "conservative_score": round(e.conservative_score, 4),
                             "pack_cost": e.pack_cost,
                             "model_mode": e.model_mode,
+                            "rarity_posteriors": {
+                                k: [round(v[0], 6), round(v[1], 6), round(v[2], 6)]
+                                for k, v in e.rarity_posteriors.items()
+                            },
+                            "calibrated_values": {
+                                k: round(v, 2) for k, v in e.calibrated_values.items()
+                            },
                         }
                         for e in evs
                     ]
