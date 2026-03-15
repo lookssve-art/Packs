@@ -73,6 +73,7 @@ class ScannerConfig:
     """Global scanner configuration."""
 
     db_path: str = "ebay_arbitrage.db"
+    demo_mode: bool = False
     discord_webhook_url: str = ""
     schedule_hours: list[int] = field(default_factory=lambda: [8, 20])
     top_n: int = 10
